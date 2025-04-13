@@ -1,49 +1,42 @@
 import { useState, useEffect } from "react";
+import {
+  TimeReference,
+  Transition,
+  MonthlyCalendar,
+  DateInfo,
+} from "./types/AppTypes";
 
 const UUIDv7DateParser = () => {
-  // State hooks
-  const [uuid, setUuid] = useState("");
-  const [dateInfo, setDateInfo] = useState(null);
-  const [timeRefs, setTimeRefs] = useState([]);
-  const [monthlyCalendar, setMonthlyCalendar] = useState([]);
-  const [prefixTransitions, setPrefixTransitions] = useState({
-    threeDigits: [],
-    fourDigits: [],
-  });
-  const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("references");
-  const [transitionDigits, setTransitionDigits] = useState(3);
+  const [uuid, setUuid] = useState<string>("");
+  const [dateInfo, setDateInfo] = useState<DateInfo | null>(null);
+  const [timeRefs, setTimeRefs] = useState<TimeReference[]>([]);
+  const [monthlyCalendar, setMonthlyCalendar] = useState<MonthlyCalendar[]>([]);
+  const [prefixTransitions, setPrefixTransitions] = useState<{
+    threeDigits: Transition[];
+    fourDigits: Transition[];
+  }>({ threeDigits: [], fourDigits: [] });
+  const [error, setError] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>("references");
+  const [transitionDigits, setTransitionDigits] = useState<number>(3);
 
   // Generate UUID v7 for a given timestamp
-  const generateUUIDv7Prefix = (timestamp) => {
-    // Simply use milliseconds since epoch directly, represented as hex
+  const generateUUIDv7Prefix = (timestamp: Date): string => {
     const milliseconds = BigInt(timestamp.getTime());
-
-    // Convert to hex string and ensure it's 12 chars long (48 bits)
-    let hexTimestamp = milliseconds.toString(16).padStart(12, "0");
-
-    // Return just the timestamp part of the UUID
-    return hexTimestamp;
+    return milliseconds.toString(16).padStart(12, "0");
   };
 
   // Parse a UUIDv7 timestamp
-  const parseUUIDv7Timestamp = (uuid) => {
-    // Remove any dashes and extract the first 48 bits (12 hex chars)
+  const parseUUIDv7Timestamp = (uuid: string): Date => {
     const cleanUuid = uuid.replace(/-/g, "");
     const timestampHex = cleanUuid.substring(0, 12);
-
-    // Convert hex timestamp directly to milliseconds
     const milliseconds = BigInt(`0x${timestampHex}`);
-
-    // Convert to JavaScript Date
     return new Date(Number(milliseconds));
   };
 
   // Generate time references
-  const generateTimeReferences = () => {
+  const generateTimeReferences = (): TimeReference[] => {
     const now = new Date();
     const refs = [
-      // Past times (in chronological order)
       {
         label: "-3 days",
         date: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
@@ -53,11 +46,7 @@ const UUIDv7DateParser = () => {
       { label: "-1 hour", date: new Date(now.getTime() - 60 * 60 * 1000) },
       { label: "-30 minutes", date: new Date(now.getTime() - 30 * 60 * 1000) },
       { label: "-15 minutes", date: new Date(now.getTime() - 15 * 60 * 1000) },
-
-      // Now
       { label: "Now", date: now, highlight: true },
-
-      // Future times (in chronological order)
       { label: "+15 minutes", date: new Date(now.getTime() + 15 * 60 * 1000) },
       { label: "+30 minutes", date: new Date(now.getTime() + 30 * 60 * 1000) },
       { label: "+1 hour", date: new Date(now.getTime() + 60 * 60 * 1000) },
@@ -69,19 +58,15 @@ const UUIDv7DateParser = () => {
       },
     ];
 
-    // This year (January 1st of current year)
     const thisYear = new Date(now.getFullYear(), 0, 1);
     refs.push({ label: "This year", date: thisYear });
 
-    // Last year (January 1st of previous year)
     const lastYear = new Date(now.getFullYear() - 1, 0, 1);
     refs.push({ label: "Last year", date: lastYear });
 
-    // This month (1st day of current month)
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     refs.push({ label: "This month", date: thisMonth });
 
-    // Last month (1st day of previous month)
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     refs.push({ label: "Last month", date: lastMonth });
 
@@ -93,15 +78,13 @@ const UUIDv7DateParser = () => {
   };
 
   // Generate calendar of months from 2020 to 2030
-  const generateMonthlyCalendar = () => {
-    const calendar = [];
+  const generateMonthlyCalendar = (): MonthlyCalendar[] => {
+    const calendar: MonthlyCalendar[] = [];
 
-    // Generate entries for each month from 2020 to 2030
     for (let year = 2020; year <= 2030; year++) {
       const yearEntries = [];
 
       for (let month = 0; month < 12; month++) {
-        // First day of the month
         const date = new Date(year, month, 1);
         const uuidPrefix = generateUUIDv7Prefix(date);
 
@@ -124,20 +107,21 @@ const UUIDv7DateParser = () => {
   };
 
   // Find all prefix transitions (for 3 and 4 digits) between 2020-2030
-  const findPrefixTransitions = () => {
-    const transitions3Digits = [];
-    const transitions4Digits = [];
-    const startPrefix = 0x0160; // Hexadecimal start
-    const endPrefix = 0x01c0; // Hexadecimal end
+  const findPrefixTransitions = (): {
+    threeDigits: Transition[];
+    fourDigits: Transition[];
+  } => {
+    const transitions3Digits: Transition[] = [];
+    const transitions4Digits: Transition[] = [];
+    const startPrefix = 0x0160;
+    const endPrefix = 0x01c0;
 
     for (let prefix = startPrefix; prefix <= endPrefix; prefix++) {
-      const hexPrefix = prefix.toString(16).padStart(4, "0"); // Ensure 4 hex digits
-      const uuid = `${hexPrefix}0000-0000-0000-000000000000`; // Zero-pad to make a valid UUID
+      const hexPrefix = prefix.toString(16).padStart(4, "0");
+      const uuid = `${hexPrefix}0000-0000-0000-000000000000`;
 
-      // Parse the UUID to get the date
       const date = parseUUIDv7Timestamp(uuid);
 
-      // Add to 3-digit transitions
       const firstThreeDigits = hexPrefix.substring(0, 3);
       if (
         transitions3Digits.length === 0 ||
@@ -156,7 +140,6 @@ const UUIDv7DateParser = () => {
         });
       }
 
-      // Add to 4-digit transitions
       const firstFourDigits = hexPrefix.substring(0, 4);
       if (
         transitions4Digits.length === 0 ||
@@ -183,16 +166,14 @@ const UUIDv7DateParser = () => {
   };
 
   // Calculate the minimum prefix length needed to uniquely identify each month
-  const getMinPrefixLength = () => {
-    // Check consecutive months to determine minimum prefix length for uniqueness
-    if (monthlyCalendar.length < 2) return 6; // Default
+  const getMinPrefixLength = (): number => {
+    if (monthlyCalendar.length < 2) return 6;
 
     let minLength = 1;
     const allPrefixes = monthlyCalendar.flatMap((year) =>
-      year.months.map((month) => month.uuidPrefix)
+      year.months.map((month: { uuidPrefix: string }) => month.uuidPrefix)
     );
 
-    // For each month, find the shortest unique prefix
     let uniqueLengthFound = false;
 
     while (!uniqueLengthFound && minLength <= 12) {
@@ -212,12 +193,11 @@ const UUIDv7DateParser = () => {
       if (uniqueLengthFound) break;
     }
 
-    // Add one more character for safety
     return Math.min(minLength + 1, 12);
   };
 
   // Handle UUID input change
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const value = e.target.value;
     setUuid(value);
 
@@ -242,16 +222,10 @@ const UUIDv7DateParser = () => {
 
   // Initialize data on component mount
   useEffect(() => {
-    // Generate time references on component mount
     setTimeRefs(generateTimeReferences());
-
-    // Generate monthly calendar
     setMonthlyCalendar(generateMonthlyCalendar());
-
-    // Find prefix transitions
     setPrefixTransitions(findPrefixTransitions());
 
-    // Set a timer to refresh time references every minute
     const interval = setInterval(() => {
       setTimeRefs(generateTimeReferences());
     }, 60000);
@@ -259,7 +233,6 @@ const UUIDv7DateParser = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Get minimum prefix length needed
   const prefixLength = getMinPrefixLength();
 
   return (
@@ -491,28 +464,35 @@ const UUIDv7DateParser = () => {
               <div key={yearData.year} className="mb-8">
                 <h3 className="text-lg font-semibold mb-2">{yearData.year}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {yearData.months.map((month) => (
-                    <div
-                      key={`${yearData.year}-${month.month}`}
-                      className="border rounded p-3"
-                    >
-                      <div className="font-semibold">
-                        {month.monthName} {yearData.year}
+                  {yearData.months.map(
+                    (month: {
+                      month: number;
+                      monthName: string;
+                      date: Date;
+                      uuidPrefix: string;
+                    }) => (
+                      <div
+                        key={`${yearData.year}-${month.month}`}
+                        className="border rounded p-3"
+                      >
+                        <div className="font-semibold">
+                          {month.monthName} {yearData.year}
+                        </div>
+                        <div className="font-mono text-sm mt-2">
+                          Prefix:{" "}
+                          <span className="bg-yellow-100 px-1">
+                            {month.uuidPrefix.substring(0, prefixLength)}
+                          </span>
+                          <span className="text-gray-400">
+                            {month.uuidPrefix.substring(prefixLength)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {month.date.toISOString().split("T")[0]}
+                        </div>
                       </div>
-                      <div className="font-mono text-sm mt-2">
-                        Prefix:{" "}
-                        <span className="bg-yellow-100 px-1">
-                          {month.uuidPrefix.substring(0, prefixLength)}
-                        </span>
-                        <span className="text-gray-400">
-                          {month.uuidPrefix.substring(prefixLength)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {month.date.toISOString().split("T")[0]}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               </div>
             ))}
@@ -524,8 +504,7 @@ const UUIDv7DateParser = () => {
         <h3 className="text-lg font-semibold mb-2">About UUIDv7</h3>
         <p>
           UUIDv7 uses the first 48 bits for a millisecond-precision timestamp
-          since the Unix epoch. This makes UUIDv7 sortable by creation time and
-          more efficient than UUIDv1.
+          since the Unix epoch. This makes UUIDv7 sortable by creation time.
         </p>
       </div>
     </div>
