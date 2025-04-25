@@ -20,9 +20,13 @@ const UUIDv7DateParser = () => {
   const [transitionDigits, setTransitionDigits] = useState<number>(3);
 
   // Generate UUID v7 for a given timestamp
-  const generateUUIDv7Prefix = (timestamp: Date): string => {
+  const generateUUIDv7 = (
+    timestamp: Date
+  ): { prefix: string; fullUUID: string } => {
     const milliseconds = BigInt(timestamp.getTime());
-    return milliseconds.toString(16).padStart(12, "0");
+    const prefix = milliseconds.toString(16).padStart(12, "0");
+    const fullUUID = `${prefix}-0000-7000-0000-000000000000`;
+    return { prefix, fullUUID };
   };
 
   // Parse a UUIDv7 timestamp
@@ -58,23 +62,15 @@ const UUIDv7DateParser = () => {
       },
     ];
 
-    const thisYear = new Date(now.getFullYear(), 0, 1);
-    refs.push({ label: "This year", date: thisYear });
-
-    const lastYear = new Date(now.getFullYear() - 1, 0, 1);
-    refs.push({ label: "Last year", date: lastYear });
-
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    refs.push({ label: "This month", date: thisMonth });
-
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    refs.push({ label: "Last month", date: lastMonth });
-
-    return refs.map((ref) => ({
-      ...ref,
-      uuidPrefix: generateUUIDv7Prefix(ref.date),
-      formattedDate: ref.date.toLocaleString(),
-    }));
+    return refs.map((ref) => {
+      const { prefix, fullUUID } = generateUUIDv7(ref.date);
+      return {
+        ...ref,
+        uuidPrefix: prefix,
+        fullUUID,
+        formattedDate: ref.date.toLocaleString(),
+      };
+    });
   };
 
   // Generate calendar of months from 2020 to 2030
@@ -86,14 +82,15 @@ const UUIDv7DateParser = () => {
 
       for (let month = 0; month < 12; month++) {
         const date = new Date(year, month, 1);
-        const uuidPrefix = generateUUIDv7Prefix(date);
+        const { prefix, fullUUID } = generateUUIDv7(date);
 
         yearEntries.push({
           year,
           month: month + 1,
           monthName: date.toLocaleString("default", { month: "long" }),
           date,
-          uuidPrefix,
+          uuidPrefix: prefix,
+          fullUUID,
         });
       }
 
@@ -313,6 +310,7 @@ const UUIDv7DateParser = () => {
                 <tr className="bg-gray-200">
                   <th className="p-2 border">Time Reference</th>
                   <th className="p-2 border">UUID Prefix</th>
+                  <th className="p-2 border">Full UUID</th>
                   <th className="p-2 border">Date & Time</th>
                 </tr>
               </thead>
@@ -330,6 +328,7 @@ const UUIDv7DateParser = () => {
                   >
                     <td className="p-2 border font-medium">{ref.label}</td>
                     <td className="p-2 border font-mono">{ref.uuidPrefix}</td>
+                    <td className="p-2 border font-mono">{ref.fullUUID}</td>
                     <td className="p-2 border">{ref.formattedDate}</td>
                   </tr>
                 ))}
@@ -422,10 +421,7 @@ const UUIDv7DateParser = () => {
                     </td>
                     <td className="p-2 border font-mono">
                       <span className="bg-yellow-100 px-1">
-                        {transition.fullPrefix.substring(0, transitionDigits)}
-                      </span>
-                      <span className="text-gray-500">
-                        {transition.fullPrefix.substring(transitionDigits)}
+                        {transition.fullPrefix}
                       </span>
                     </td>
                   </tr>
@@ -470,6 +466,7 @@ const UUIDv7DateParser = () => {
                       monthName: string;
                       date: Date;
                       uuidPrefix: string;
+                      fullUUID: string;
                     }) => (
                       <div
                         key={`${yearData.year}-${month.month}`}
@@ -481,10 +478,13 @@ const UUIDv7DateParser = () => {
                         <div className="font-mono text-sm mt-2">
                           Prefix:{" "}
                           <span className="bg-yellow-100 px-1">
-                            {month.uuidPrefix.substring(0, prefixLength)}
+                            {month.uuidPrefix}
                           </span>
-                          <span className="text-gray-400">
-                            {month.uuidPrefix.substring(prefixLength)}
+                        </div>
+                        <div className="font-mono text-sm mt-2">
+                          Full UUID:{" "}
+                          <span className="bg-yellow-100 px-1">
+                            {month.fullUUID}
                           </span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
