@@ -20,6 +20,7 @@ export interface Month {
   monthName: string;
   date: Date;
   uuidPrefix: string;
+  fullUUID: string;
 }
 
 export interface YearData {
@@ -29,6 +30,7 @@ export interface YearData {
 
 export interface TimeReference {
   uuidPrefix: string;
+  fullUUID: string;
   formattedDate: string;
   label: string;
   date: Date;
@@ -48,11 +50,5 @@ export interface DateInfo {
 
 export interface MonthlyCalendar {
   year: number;
-  months: {
-    year: number;
-    month: number;
-    monthName: string;
-    date: Date;
-    uuidPrefix: string;
-  }[];
+  months: Month[];
 }
