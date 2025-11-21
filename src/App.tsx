@@ -8,6 +8,7 @@ import {
 
 const UUIDv7DateParser = () => {
   const [uuid, setUuid] = useState<string>("");
+  const [generatedUuid, setGeneratedUuid] = useState<string>("");
   const [dateInfo, setDateInfo] = useState<DateInfo | null>(null);
   const [timeRefs, setTimeRefs] = useState<TimeReference[]>([]);
   const [monthlyCalendar, setMonthlyCalendar] = useState<MonthlyCalendar[]>([]);
@@ -18,20 +19,68 @@ const UUIDv7DateParser = () => {
   const [error, setError] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("references");
   const [transitionDigits, setTransitionDigits] = useState<number>(3);
+  const [displayFormat, setDisplayFormat] = useState<"uuid" | "guid">("uuid");
+  const [copyMessage, setCopyMessage] = useState<string>("");
+
+  const formatUuidForDisplay = (rawUuid: string): string => {
+    if (!rawUuid) return "";
+
+    if (displayFormat === "guid") {
+      const upper = rawUuid.toUpperCase();
+      return `{${upper}}`;
+    }
+
+    return rawUuid.toLowerCase();
+  };
+
+  const formatPrefixForDisplay = (prefix: string): string => {
+    return displayFormat === "guid" ? prefix.toUpperCase() : prefix;
+  };
+
+  const cleanUuidForParsing = (value: string): string => {
+    return value.replace(/[{}-]/g, "").toLowerCase();
+  };
+
+  const generateUUIDv7Value = (timestamp: Date = new Date()): string => {
+    const unixMs = BigInt(timestamp.getTime());
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+
+    bytes[0] = Number((unixMs >> 40n) & 0xffn);
+    bytes[1] = Number((unixMs >> 32n) & 0xffn);
+    bytes[2] = Number((unixMs >> 24n) & 0xffn);
+    bytes[3] = Number((unixMs >> 16n) & 0xffn);
+    bytes[4] = Number((unixMs >> 8n) & 0xffn);
+    bytes[5] = Number(unixMs & 0xffn);
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x70; // Version 7
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC 4122
+
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+      .slice(6, 8)
+      .join("")}-${hex.slice(8, 10).join("")}-${hex
+      .slice(10)
+      .join("")}`;
+  };
 
   // Generate UUID v7 for a given timestamp
   const generateUUIDv7 = (
     timestamp: Date
   ): { prefix: string; fullUUID: string } => {
-    const milliseconds = BigInt(timestamp.getTime());
-    const prefix = milliseconds.toString(16).padStart(12, "0");
-    const fullUUID = `${prefix}-0000-7000-0000-000000000000`;
+    const fullUUID = generateUUIDv7Value(timestamp).toLowerCase();
+    const prefix = cleanUuidForParsing(fullUUID).substring(0, 12);
     return { prefix, fullUUID };
   };
 
   // Parse a UUIDv7 timestamp
   const parseUUIDv7Timestamp = (uuid: string): Date => {
-    const cleanUuid = uuid.replace(/-/g, "");
+    const cleanUuid = cleanUuidForParsing(uuid);
+
+    if (!/^[0-9a-f]+$/.test(cleanUuid)) {
+      throw new Error("Invalid characters in UUID");
+    }
+
     const timestampHex = cleanUuid.substring(0, 12);
     const milliseconds = BigInt(`0x${timestampHex}`);
     return new Date(Number(milliseconds));
@@ -198,8 +247,16 @@ const UUIDv7DateParser = () => {
     const value = e.target.value;
     setUuid(value);
 
+    const cleanedValue = cleanUuidForParsing(value);
+
+    if (value && !/^[0-9a-fA-F{}-]+$/.test(value)) {
+      setDateInfo(null);
+      setError("Please use only hexadecimal characters, braces, or hyphens");
+      return;
+    }
+
     try {
-      if (value.length >= 12) {
+      if (cleanedValue.length >= 12) {
         const date = parseUUIDv7Timestamp(value);
         setDateInfo({
           date,
@@ -217,8 +274,36 @@ const UUIDv7DateParser = () => {
     }
   };
 
+  const handleGenerateUuid = () => {
+    const fresh = generateUUIDv7Value();
+    setGeneratedUuid(fresh);
+    setUuid(fresh);
+
+    const date = parseUUIDv7Timestamp(fresh);
+    setDateInfo({
+      date,
+      formatted: date.toLocaleString(),
+      iso: date.toISOString(),
+    });
+    setError("");
+  };
+
+  const handleCopy = async () => {
+    if (!generatedUuid) return;
+    const formatted = formatUuidForDisplay(generatedUuid);
+
+    try {
+      await navigator.clipboard.writeText(formatted);
+      setCopyMessage("Copied!");
+      setTimeout(() => setCopyMessage(""), 1500);
+    } catch (err) {
+      setCopyMessage("Clipboard unavailable");
+    }
+  };
+
   // Initialize data on component mount
   useEffect(() => {
+    handleGenerateUuid();
     setTimeRefs(generateTimeReferences());
     setMonthlyCalendar(generateMonthlyCalendar());
     setPrefixTransitions(findPrefixTransitions());
@@ -234,7 +319,58 @@ const UUIDv7DateParser = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">UUIDv7 Date Parser</h1>
+      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-2xl font-bold">UUIDv7 Date Parser</h1>
+        <div className="inline-flex rounded overflow-hidden border">
+          <button
+            className={`px-3 py-1 text-sm font-medium ${
+              displayFormat === "uuid"
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700"
+            }`}
+            onClick={() => setDisplayFormat("uuid")}
+          >
+            UUID display
+          </button>
+          <button
+            className={`px-3 py-1 text-sm font-medium ${
+              displayFormat === "guid"
+                ? "bg-blue-600 text-white"
+                : "bg-white text-gray-700"
+            }`}
+            onClick={() => setDisplayFormat("guid")}
+          >
+            .NET GUID display
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 p-4 bg-blue-50 rounded border border-blue-200">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700">Fresh UUIDv7</p>
+            <p className="font-mono text-lg break-all">
+              {formatUuidForDisplay(generatedUuid) || "Generating..."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-3 py-2 bg-blue-600 text-white rounded"
+              onClick={handleGenerateUuid}
+            >
+              Generate new
+            </button>
+            <button
+              className="px-3 py-2 border rounded bg-white"
+              onClick={handleCopy}
+              disabled={!generatedUuid}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+        {copyMessage && <p className="text-sm text-green-600 mt-2">{copyMessage}</p>}
+      </div>
 
       {/* UUID Parser - Always visible */}
       <div className="mb-8 p-4 bg-gray-50 rounded border">
@@ -243,7 +379,7 @@ const UUIDv7DateParser = () => {
           type="text"
           value={uuid}
           onChange={handleChange}
-          placeholder="e.g., 01890c1c-35f1-7000-9c9f-4237c55a8d19"
+          placeholder="e.g., 01890c1c-35f1-7000-9c9f-4237c55a8d19 or {01890C1C-35F1-7000-9C9F-4237C55A8D19}"
           className="w-full p-2 border rounded"
         />
 
@@ -327,8 +463,12 @@ const UUIDv7DateParser = () => {
                     }
                   >
                     <td className="p-2 border font-medium">{ref.label}</td>
-                    <td className="p-2 border font-mono">{ref.uuidPrefix}</td>
-                    <td className="p-2 border font-mono">{ref.fullUUID}</td>
+                    <td className="p-2 border font-mono">
+                      {formatPrefixForDisplay(ref.uuidPrefix)}
+                    </td>
+                    <td className="p-2 border font-mono">
+                      {formatUuidForDisplay(ref.fullUUID)}
+                    </td>
                     <td className="p-2 border">{ref.formattedDate}</td>
                   </tr>
                 ))}
@@ -421,7 +561,7 @@ const UUIDv7DateParser = () => {
                     </td>
                     <td className="p-2 border font-mono">
                       <span className="bg-yellow-100 px-1">
-                        {transition.fullPrefix}
+                        {formatPrefixForDisplay(transition.fullPrefix)}
                       </span>
                     </td>
                   </tr>
@@ -478,13 +618,13 @@ const UUIDv7DateParser = () => {
                         <div className="font-mono text-sm mt-2">
                           Prefix:{" "}
                           <span className="bg-yellow-100 px-1">
-                            {month.uuidPrefix}
+                            {formatPrefixForDisplay(month.uuidPrefix)}
                           </span>
                         </div>
                         <div className="font-mono text-sm mt-2">
                           Full UUID:{" "}
                           <span className="bg-yellow-100 px-1">
-                            {month.fullUUID}
+                            {formatUuidForDisplay(month.fullUUID)}
                           </span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
